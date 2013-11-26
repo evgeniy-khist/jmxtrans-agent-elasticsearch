@@ -29,9 +29,15 @@ import static org.jmxtrans.agent.util.JsonUtils.toJson;
  */
 public class ElasticSearch {
 
+    private final String host; 
+    private final int port;
+    private final boolean sslEnabled;
     private final String urlStr;
 
     public ElasticSearch(String elasticsearchHost, int elasticsearchPort, boolean sslEnabled) {
+        this.host = elasticsearchHost;
+        this.port = elasticsearchPort;
+        this.sslEnabled = sslEnabled;
         this.urlStr = (sslEnabled ? "https" : "http") + "://" + elasticsearchHost + ":" + elasticsearchPort + "/";
     }
 
@@ -48,5 +54,17 @@ public class ElasticSearch {
         int responseCode = connection.getResponseCode();
         connection.disconnect();
         return responseCode;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public boolean isSslEnabled() {
+        return sslEnabled;
     }
 }
