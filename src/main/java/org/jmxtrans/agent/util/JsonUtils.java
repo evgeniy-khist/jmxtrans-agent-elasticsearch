@@ -28,7 +28,12 @@ public class JsonUtils {
         int i = 0;
         StringBuilder sb = new StringBuilder("{");
         for (Map.Entry<String, Object> entry : document.entrySet()) {
-            sb.append(entry.getKey()).append(":").append(entry.getValue());
+            sb.append("\"").append(entry.getKey()).append("\":");
+            if (entry.getValue() instanceof Number) {
+                sb.append(entry.getValue());
+            } else {
+                sb.append("\"").append(entry.getValue()).append("\"");
+            }
             if (++i < length) {
                 sb.append(",");
             }

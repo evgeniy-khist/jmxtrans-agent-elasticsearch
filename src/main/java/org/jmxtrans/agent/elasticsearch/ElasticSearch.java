@@ -15,6 +15,7 @@
  */
 package org.jmxtrans.agent.elasticsearch;
 
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -28,28 +29,24 @@ import static org.jmxtrans.agent.util.JsonUtils.toJson;
  */
 public class ElasticSearch {
 
-    private final String elasticsearchHost;
-    private final int elasticsearchPort;
+    private final String urlStr;
 
-    public ElasticSearch(String elasticsearchHost, int elasticsearchPort) {
-        this.elasticsearchHost = elasticsearchHost;
-        this.elasticsearchPort = elasticsearchPort;
+    public ElasticSearch(String elasticsearchHost, int elasticsearchPort, boolean sslEnabled) {
+        this.urlStr = (sslEnabled ? "https" : "http") + "://" + elasticsearchHost + ":" + elasticsearchPort + "/";
     }
-    
-    public void saveOrUpdate(String index, String type, Map<String, Object> document) {
-        try {
-            URL url = new URL("http://" + elasticsearchHost + ":" + elasticsearchPort + "/" + index + "/" + type + "/");
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json");
-            OutputStreamWriter osw = new OutputStreamWriter(connection.getOutputStream());
+
+    public int saveOrUpdate(String index, String type, Map<String, Object> document) throws IOException {
+        URL url = new URL(urlStr + index + "/" + type + "/");
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setDoOutput(true);
+        connection.setRequestProperty("Content-Type", "application/json");
+        try (OutputStreamWriter osw = new OutputStreamWriter(connection.getOutputStream())) {
             osw.write(toJson(document));
             osw.flush();
-            osw.close();
-            System.out.println("org.jmxtrans.agent.elasticsearch.ElasticSearch.saveOrUpdate: ResponseCode=" + connection.getResponseCode());
-        } catch(Exception e) {
-            System.err.println("org.jmxtrans.agent.elasticsearch.ElasticSearch.saveOrUpdate: Error=" + e.getMessage());
         }
+        int responseCode = connection.getResponseCode();
+        connection.disconnect();
+        return responseCode;
     }
 }
