@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Map;
-
-import static org.jmxtrans.agent.util.JsonUtils.toJson;
 
 /**
  *
@@ -41,14 +38,14 @@ public class ElasticSearch {
         this.urlStr = (sslEnabled ? "https" : "http") + "://" + elasticsearchHost + ":" + elasticsearchPort + "/";
     }
 
-    public int saveOrUpdate(String index, String type, Map<String, Object> document) throws IOException {
+    public int saveOrUpdate(String index, String type, Document document) throws IOException {
         URL url = new URL(urlStr + index + "/" + type + "/");
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
         try (OutputStreamWriter osw = new OutputStreamWriter(connection.getOutputStream())) {
-            osw.write(toJson(document));
+            osw.write(document.toJson());
             osw.flush();
         }
         int responseCode = connection.getResponseCode();
