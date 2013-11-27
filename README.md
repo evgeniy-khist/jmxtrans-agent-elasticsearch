@@ -19,7 +19,7 @@ jmxtrans-agent-elasticsearch
         <query objectName="java.lang:type=Threading" attribute="ThreadCount" resultAlias="jvm.thread"/>
     </queries>
     <outputWriter class="org.jmxtrans.agent.ElasticSearchOutputWriter">
-        <host>logs</host>
+        <host>localhost</host>
         <port>9200</port>
         <sslEnabled>false</sslEnabled>
         <index>jmxtrans-%{yyyy.MM.dd}</index>
