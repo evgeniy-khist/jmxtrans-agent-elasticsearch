@@ -41,7 +41,7 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
     private static final String ELASTICSEARCH_PORT = "port";
     private static final int ELASTICSEARCH_PORT_DEFAULT_VALUE = 9200;
     
-    private static final String ELASTICSEARCH_SSL_ENABLED = "ssl";
+    private static final String ELASTICSEARCH_SSL_ENABLED = "sslEnabled";
     private static final boolean ELASTICSEARCH_SSL_ENABLED_DEFAULT_VALUE = false;
     
     private static final String INDEX = "index";
