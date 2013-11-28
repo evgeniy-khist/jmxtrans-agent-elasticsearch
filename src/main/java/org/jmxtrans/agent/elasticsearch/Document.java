@@ -15,8 +15,6 @@
  */
 package org.jmxtrans.agent.elasticsearch;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jmxtrans.agent.util.JsonUtils;
@@ -27,18 +25,11 @@ import org.jmxtrans.agent.util.JsonUtils;
  */
 public class Document {
 
-    private static final String TIMESTAMP_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
+    private final Map<String, Object> document = new ConcurrentHashMap<>();
+    private final boolean omitEmptyValues;
     
-    private Map<String, Object> document = new ConcurrentHashMap<>();
-
-    public Document(Date timestamp, String host, String nodeName) {
-        document.put("@timestamp", new SimpleDateFormat(TIMESTAMP_FORMAT).format(timestamp));
-        if (host != null) {
-            document.put("host", host);
-        }
-        if (nodeName != null) {
-            document.put("nodeName", nodeName);
-        }
+    public Document(boolean omitEmptyValues) {
+        this.omitEmptyValues = omitEmptyValues;
     }
     
     public Object put(String key, Object value) {
@@ -46,6 +37,6 @@ public class Document {
     }
 
     public String toJson() {
-        return JsonUtils.toJson(document);
+        return JsonUtils.toJson(document, omitEmptyValues);
     }
 }

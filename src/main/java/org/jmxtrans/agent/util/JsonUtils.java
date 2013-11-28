@@ -23,11 +23,14 @@ import java.util.Map;
  */
 public class JsonUtils {
     
-    public static String toJson(Map<String, Object> document) {
+    public static String toJson(Map<String, Object> document, boolean omitEmptyValues) {
         int length = document.size();
         int i = 0;
         StringBuilder sb = new StringBuilder("{");
         for (Map.Entry<String, Object> entry : document.entrySet()) {
+            if (omitEmptyValues && entry.getValue() == null) {
+                continue;
+            }
             sb.append("\"").append(entry.getKey()).append("\":");
             if (entry.getValue() instanceof Number) {
                 sb.append(entry.getValue());

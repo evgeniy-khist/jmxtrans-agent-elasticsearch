@@ -18,6 +18,7 @@ package org.jmxtrans.agent;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,6 +36,8 @@ import static org.jmxtrans.agent.util.ConfigurationUtils.getInt;
  */
 public class ElasticSearchOutputWriter extends AbstractOutputWriter {
 
+    private static final String TIMESTAMP_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
+    
     private static final String ELASTICSEARCH_HOST = "host";
     private static final String ELASTICSEARCH_HOST_DEFAULT_VALUE = "localhost";
     
@@ -50,6 +53,9 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
     private static final String USE_PREFIX_AS_TYPE = "usePrefixAsType";
     private static final boolean USE_PREFIX_AS_TYPE_DEFAULT_VALUE = true;
     
+    private static final String OMIT_EMPTY_VALUES = "omitEmptyValues";
+    private static final boolean OMIT_EMPTY_VALUES_DEFAULT_VALUE = true;
+    
     private static final String TYPE_DEFAULT_VALUE = "jmxtrans";
     
     private static final String NODE_NAME = "nodeName";
@@ -58,6 +64,7 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
 
     private IndexNameBuilder indexNameBuilder;
     private boolean usePrefixAsType;
+    private boolean omitEmptyValues;
     
     private String host;
     private String nodeName;
@@ -67,6 +74,14 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
         @Override
         protected Map<String, Document> initialValue() {
             return new ConcurrentHashMap<>();
+        }
+    };
+    
+    private ThreadLocal<Date> timestamp = new ThreadLocal<Date>() {
+        
+        @Override
+        protected Date initialValue() {
+            return new Date();
         }
     };
     
@@ -90,6 +105,9 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
         usePrefixAsType = Boolean.parseBoolean(
                 getString(settings, USE_PREFIX_AS_TYPE, String.valueOf(USE_PREFIX_AS_TYPE_DEFAULT_VALUE)));
         
+        omitEmptyValues = Boolean.parseBoolean(
+                getString(settings, OMIT_EMPTY_VALUES, String.valueOf(OMIT_EMPTY_VALUES_DEFAULT_VALUE)));
+        
         try {
             host = InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException e) {
@@ -100,11 +118,16 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
     }
 
     @Override
+    public void preCollect() throws IOException {
+        timestamp.set(new Date());
+    }
+    
+    @Override
     public void writeQueryResult(String name, String type, Object value) throws IOException {
         Map<String, Document> currentDocuments = documents.get();
         String documentType = getType(name);
         if (!currentDocuments.containsKey(documentType)) {
-            currentDocuments.put(documentType, new Document(new Date(), host, nodeName));
+            currentDocuments.put(documentType, newDocument());
         }
         Document document = currentDocuments.get(documentType);
         document.put(name, value);
@@ -123,9 +146,22 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
             logger.log(getInfoLevel(), "Metrics sent to ElasticSearch responseCode=" + responseCode);
         }
         documents.remove();
+        timestamp.remove();
     }
     
     private String getType(String name) {
         return usePrefixAsType ? TypeNameCreator.fromPrefix(name) : TYPE_DEFAULT_VALUE;
+    }
+
+    private Document newDocument() {
+        Document document = new Document(omitEmptyValues);
+        document.put("@timestamp", new SimpleDateFormat(TIMESTAMP_FORMAT).format(timestamp.get()));
+        if (host != null) {
+            document.put("host", host);
+        }
+        if (nodeName != null) {
+            document.put("nodeName", nodeName);
+        }
+        return document;
     }
 }
