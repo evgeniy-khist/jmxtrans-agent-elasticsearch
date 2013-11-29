@@ -22,7 +22,7 @@ jmxtrans-agent-elasticsearch
     </queries>
     <outputWriter class="org.jmxtrans.agent.ElasticSearchOutputWriter">
         <elasticsearchHost>localhost</elasticsearchHost>
-        <elasticsearchPort>9200</elasticsearchPort>
+        <elasticsearchPort>9300</elasticsearchPort>
         <elasticsearchClusterName>elasticsearch</elasticsearchClusterName>
         <elasticsearchIndex>jmxtrans-%{yyyy.MM.dd}</elasticsearchIndex>
         <nodeName>nodeName</nodeName><!--empty by default-->
