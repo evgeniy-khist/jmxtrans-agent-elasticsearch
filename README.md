@@ -21,13 +21,12 @@ jmxtrans-agent-elasticsearch
         <query objectName="java.lang:type=Threading" attribute="PeakThreadCount" resultAlias="jvm.peakThreadCount"/>
     </queries>
     <outputWriter class="org.jmxtrans.agent.ElasticSearchOutputWriter">
-        <host>localhost</host>
-        <port>9200</port>
-        <sslEnabled>false</sslEnabled>
-        <index>jmxtrans-%{yyyy.MM.dd}</index>
+        <elasticsearchHost>localhost</elasticsearchHost>
+        <elasticsearchPort>9200</elasticsearchPort>
+        <elasticsearchClusterName>elasticsearch</elasticsearchClusterName>
+        <elasticsearchIndex>jmxtrans-%{yyyy.MM.dd}</elasticsearchIndex>
         <nodeName>nodeName</nodeName><!--empty by default-->
         <usePrefixAsType>true</usePrefixAsType>
-        <omitEmptyValues>true</omitEmptyValues>
     </outputWriter>
     <collectIntervalInSeconds>20</collectIntervalInSeconds>
 </jmxtrans-agent>

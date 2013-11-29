@@ -20,13 +20,17 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
-import org.jmxtrans.agent.elasticsearch.Document;
-import org.jmxtrans.agent.elasticsearch.ElasticSearch;
-import org.jmxtrans.agent.elasticsearch.IndexNameBuilder;
-import org.jmxtrans.agent.elasticsearch.TypeNameCreator;
+import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.client.Client;
+import org.elasticsearch.client.transport.TransportClient;
+import org.elasticsearch.common.settings.ImmutableSettings;
+import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.jmxtrans.agent.elasticsearch.util.IndexNameBuilder;
+import org.jmxtrans.agent.elasticsearch.util.TypeNameCreator;
 import static org.jmxtrans.agent.util.ConfigurationUtils.getString;
 import static org.jmxtrans.agent.util.ConfigurationUtils.getInt;
 
@@ -38,50 +42,38 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
 
     private static final String TIMESTAMP_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
     
-    private static final String ELASTICSEARCH_HOST = "host";
+    private static final String ELASTICSEARCH_HOST = "elasticsearchHost";
     private static final String ELASTICSEARCH_HOST_DEFAULT_VALUE = "localhost";
     
-    private static final String ELASTICSEARCH_PORT = "port";
+    private static final String ELASTICSEARCH_PORT = "elasticsearchPort";
     private static final int ELASTICSEARCH_PORT_DEFAULT_VALUE = 9200;
     
-    private static final String ELASTICSEARCH_SSL_ENABLED = "sslEnabled";
-    private static final boolean ELASTICSEARCH_SSL_ENABLED_DEFAULT_VALUE = false;
+    private static final String ELASTICSEARCH_CLUSTER_NAME = "elasticsearchClusterName";
+    private static final String ELASTICSEARCH_CLUSTER_NAME_DEFAULT_VALUE = "elasticsearch";
     
-    private static final String INDEX = "index";
-    private static final String INDEX_DEFAULT_VALUE = "jmxtrans-%{yyyy.MM.dd}";
+    private static final String ELASTICSEARCH_INDEX = "elasticsearchIndex";
+    private static final String ELASTICSEARCH_INDEX_DEFAULT_VALUE = "jmxtrans-%{yyyy.MM.dd}";
     
     private static final String USE_PREFIX_AS_TYPE = "usePrefixAsType";
     private static final boolean USE_PREFIX_AS_TYPE_DEFAULT_VALUE = true;
-    
-    private static final String OMIT_EMPTY_VALUES = "omitEmptyValues";
-    private static final boolean OMIT_EMPTY_VALUES_DEFAULT_VALUE = true;
     
     private static final String TYPE_DEFAULT_VALUE = "jmxtrans";
     
     private static final String NODE_NAME = "nodeName";
     
-    private ElasticSearch elasticSearch;
+    private Client elasticsearchClient;
 
     private IndexNameBuilder indexNameBuilder;
     private boolean usePrefixAsType;
-    private boolean omitEmptyValues;
     
     private String host;
     private String nodeName;
     
-    private ThreadLocal<Map<String, Document>> documents = new ThreadLocal<Map<String, Document>>() {
+    private ThreadLocal<Map<String, Map<String, Object>>> documents = new ThreadLocal<Map<String, Map<String, Object>>>() {
 
         @Override
-        protected Map<String, Document> initialValue() {
-            return new ConcurrentHashMap<>();
-        }
-    };
-    
-    private ThreadLocal<Date> timestamp = new ThreadLocal<Date>() {
-        
-        @Override
-        protected Date initialValue() {
-            return new Date();
+        protected Map<String, Map<String, Object>> initialValue() {
+            return new HashMap<>();
         }
     };
     
@@ -91,22 +83,24 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
         
         String elasticSearchHost = getString(settings, ELASTICSEARCH_HOST, ELASTICSEARCH_HOST_DEFAULT_VALUE);
         int elasticSearchPort = getInt(settings, ELASTICSEARCH_PORT, ELASTICSEARCH_PORT_DEFAULT_VALUE);
-        boolean elasticSearchSslEnabled = Boolean.parseBoolean(
-                getString(settings, ELASTICSEARCH_SSL_ENABLED, String.valueOf(ELASTICSEARCH_SSL_ENABLED_DEFAULT_VALUE)));
+        String elasticsearchClusterName = getString(settings, ELASTICSEARCH_CLUSTER_NAME, ELASTICSEARCH_CLUSTER_NAME_DEFAULT_VALUE);
         
-        elasticSearch = new ElasticSearch(elasticSearchHost, elasticSearchPort, elasticSearchSslEnabled);
+        Settings elasticsearchSettings = ImmutableSettings.settingsBuilder()
+                .put("cluster.name", elasticsearchClusterName)
+                .put("client.transport.sniff", true)
+                .build();
+
+        elasticsearchClient = new TransportClient(elasticsearchSettings)
+                .addTransportAddress(new InetSocketTransportAddress(elasticSearchHost, elasticSearchPort));
+
+        logger.log(getInfoLevel(), 
+                String.format("ElasticSearchOutputWriter is configured with host=%s, port=%s", elasticSearchHost, elasticSearchPort));
         
-        logger.log(getInfoLevel(), "ElasticSearchOutputWriter is configured with host=" + elasticSearchHost + 
-                ", port=" + elasticSearchPort + ", sslEnabled=" + elasticSearchSslEnabled);
-        
-        String indexNamePattern = getString(settings, INDEX, INDEX_DEFAULT_VALUE);
+        String indexNamePattern = getString(settings, ELASTICSEARCH_INDEX, ELASTICSEARCH_INDEX_DEFAULT_VALUE);
         indexNameBuilder = new IndexNameBuilder(indexNamePattern);
         
         usePrefixAsType = Boolean.parseBoolean(
                 getString(settings, USE_PREFIX_AS_TYPE, String.valueOf(USE_PREFIX_AS_TYPE_DEFAULT_VALUE)));
-        
-        omitEmptyValues = Boolean.parseBoolean(
-                getString(settings, OMIT_EMPTY_VALUES, String.valueOf(OMIT_EMPTY_VALUES_DEFAULT_VALUE)));
         
         try {
             host = InetAddress.getLocalHost().getHostName();
@@ -116,20 +110,20 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
         
         nodeName = getString(settings, NODE_NAME, null);
     }
-
-    @Override
-    public void preCollect() throws IOException {
-        timestamp.set(new Date());
-    }
     
     @Override
+    public void preDestroy() {
+        elasticsearchClient.close();
+    }
+
+    @Override
     public void writeQueryResult(String name, String type, Object value) throws IOException {
-        Map<String, Document> currentDocuments = documents.get();
+        Map<String, Map<String, Object>> currentThreadDocuments = documents.get();
         String documentType = getType(name);
-        if (!currentDocuments.containsKey(documentType)) {
-            currentDocuments.put(documentType, newDocument());
+        if (!currentThreadDocuments.containsKey(documentType)) {
+            currentThreadDocuments.put(documentType, newDocument());
         }
-        Document document = currentDocuments.get(documentType);
+        Map<String, Object> document = currentThreadDocuments.get(documentType);
         document.put(name, value);
     }
     
@@ -140,22 +134,32 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
 
     @Override
     public void postCollect() throws IOException {
-        Map<String, Document> currentDocuments = documents.get();
-        for (Map.Entry<String, Document> entry : currentDocuments.entrySet()) {
-            int responseCode = elasticSearch.saveOrUpdate(indexNameBuilder.build(new Date()), entry.getKey(), entry.getValue());
-            logger.log(getInfoLevel(), "Metrics sent to ElasticSearch responseCode=" + responseCode);
+        Date timestamp = new Date();
+        Map<String, Map<String, Object>> currentThreadDocuments = documents.get();
+        for (Map.Entry<String, Map<String, Object>> entry : currentThreadDocuments.entrySet()) {
+            String type = entry.getKey();
+            
+            Map<String, Object> document = entry.getValue();
+            document.put("@timestamp", new SimpleDateFormat(TIMESTAMP_FORMAT).format(timestamp));
+            
+            IndexResponse response = elasticsearchClient
+                    .prepareIndex(indexNameBuilder.build(timestamp), type)
+                    .setSource(document)
+                    .execute()
+                    .actionGet();
+            
+            logger.log(getInfoLevel(), 
+                    String.format("Metrics sent to ElasticSearch responseId=%s",  response.getId()));
         }
         documents.remove();
-        timestamp.remove();
     }
     
     private String getType(String name) {
         return usePrefixAsType ? TypeNameCreator.fromPrefix(name) : TYPE_DEFAULT_VALUE;
     }
 
-    private Document newDocument() {
-        Document document = new Document(omitEmptyValues);
-        document.put("@timestamp", new SimpleDateFormat(TIMESTAMP_FORMAT).format(timestamp.get()));
+    private Map<String, Object> newDocument() {
+        Map<String, Object> document = new HashMap<>();
         if (host != null) {
             document.put("host", host);
         }
