@@ -46,7 +46,7 @@ public class ElasticSearchOutputWriter extends AbstractOutputWriter {
     private static final String ELASTICSEARCH_HOST_DEFAULT_VALUE = "localhost";
     
     private static final String ELASTICSEARCH_PORT = "elasticsearchPort";
-    private static final int ELASTICSEARCH_PORT_DEFAULT_VALUE = 9200;
+    private static final int ELASTICSEARCH_PORT_DEFAULT_VALUE = 9300;
     
     private static final String ELASTICSEARCH_CLUSTER_NAME = "elasticsearchClusterName";
     private static final String ELASTICSEARCH_CLUSTER_NAME_DEFAULT_VALUE = "elasticsearch";
