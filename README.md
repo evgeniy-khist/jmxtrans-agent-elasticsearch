@@ -1,5 +1,7 @@
 jmxtrans-agent-elasticsearch
 ============================
+**jmxtrans-agent-elasticsearch** adds to [jmxtrans-agent](https://github.com/jmxtrans/jmxtrans-agent) [ElasticSearchOutputWriter](https://github.com/evgeniy-khist/jmxtrans-agent-elasticsearch/blob/master/src/main/java/org/jmxtrans/agent/ElasticSearchOutputWriter.java) that sends metrics to [Elasticsearch](www.elasticsearch.org). It has zero dependencies to ease integration.
+
 ```xml
 <jmxtrans-agent>
     <queries>
@@ -31,3 +33,5 @@ jmxtrans-agent-elasticsearch
     <collectIntervalInSeconds>20</collectIntervalInSeconds>
 </jmxtrans-agent>
 ```
+
+If value of `elasticsearchIndex` contains date placeholder like %{yyyy.MM.dd} it will be replaced with current date and time string representation based on specified format.
