@@ -34,4 +34,4 @@ jmxtrans-agent-elasticsearch
 </jmxtrans-agent>
 ```
 
-If value of `elasticsearchIndex` contains date placeholder like %{yyyy.MM.dd} it will be replaced with current date and time string representation based on specified format.
+If value of `elasticsearchIndex` contains date placeholder like `%{yyyy.MM.dd}` it will be replaced with current date and time string representation based on specified format.
